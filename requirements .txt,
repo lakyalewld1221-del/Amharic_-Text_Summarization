@@ -1,4 +1,7 @@
-streamlit
-torch==2.6.0
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
 transformers
 sentencepiece
+protobuf
+streamlit
+accelerate
