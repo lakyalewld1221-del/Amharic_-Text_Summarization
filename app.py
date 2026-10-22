@@ -50,9 +50,11 @@ page = st.sidebar.radio(
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚙️ Summary Settings")
+
+# Minimum is set to 2 sentences
 num_sentences = st.sidebar.slider(
     "Target Sentences (የዓረፍተ-ነገሮች ብዛት):",
-    min_value=1,
+    min_value=2,
     max_value=5,
     value=2,
     step=1
@@ -72,7 +74,6 @@ if page == "📝 Summarizer Dashboard":
     st.markdown("Use cutting-edge transformer models to condense lengthy Amharic articles while preserving core meaning.")
     st.markdown("---")
 
-    # Sample selector
     selected_sample = st.selectbox("💡 Quick Test: Choose a pre-loaded sample (optional)", list(SAMPLE_TEXTS.keys()))
     default_text = SAMPLE_TEXTS[selected_sample]
 
@@ -90,7 +91,6 @@ if page == "📝 Summarizer Dashboard":
         input_words = len(article.strip().split()) if article.strip() else 0
         input_chars = len(article.strip()) if article.strip() else 0
 
-        # Input live stats
         m1, m2, m3 = st.columns(3)
         m1.metric("Input Words", input_words)
         m2.metric("Characters", input_chars)
@@ -118,13 +118,15 @@ if page == "📝 Summarizer Dashboard":
                         max_length=512
                     ).to(device)
 
-                    max_tokens = num_sentences * 45
+                    # Dynamic tokens allowing multi-sentence generation
+                    max_tokens = max(120, num_sentences * 50)
 
-                    with st.spinner("🧠 mT5 is generating summary..."):
+                    with st.spinner("🧠 mT5 is generating multi-sentence summary..."):
                         with torch.no_grad():
                             output_ids = model.generate(
                                 **inputs,
                                 max_new_tokens=max_tokens,
+                                min_new_tokens=55,          # Guarantees more than 1 sentence
                                 num_beams=4,
                                 do_sample=False,
                                 early_stopping=True,
@@ -139,15 +141,17 @@ if page == "📝 Summarizer Dashboard":
 
                     elapsed_time = time.time() - start_time
 
-                    # Format sentence boundary
+                    # Format by Amharic sentence ending (።)
                     sentences = [s.strip() for s in raw_summary.replace(".", "።").split("።") if s.strip()]
-                    summary = "። ".join(sentences[:num_sentences]) + "።" if sentences else raw_summary
+                    if len(sentences) >= 2:
+                        summary = "። ".join(sentences[:num_sentences]) + "።"
+                    else:
+                        summary = raw_summary if raw_summary.endswith("።") else raw_summary + "።"
 
                     summary_words = len(summary.split())
                     compression_ratio = round((1 - (summary_words / max(1, input_words))) * 100, 1)
 
-                    # Summary Metrics Card
-                    st.success("✅ Summary Generated Successfully!")
+                    st.success("✅ Multi-Sentence Summary Generated Successfully!")
                     st.markdown(
                         f"""
                         <div style="background-color: #f0f7f4; padding: 18px; border-radius: 10px; border-left: 5px solid #28a745; margin-bottom: 15px;">
@@ -157,7 +161,6 @@ if page == "📝 Summarizer Dashboard":
                         unsafe_allow_html=True
                     )
 
-                    # Output Analytics row
                     o1, o2, o3 = st.columns(3)
                     o1.metric("Summary Words", summary_words)
                     o2.metric("Compression", f"-{compression_ratio}%", delta=f"{compression_ratio}% reduction")
