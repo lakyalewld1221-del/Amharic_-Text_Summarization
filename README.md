@@ -1,1 +1,1 @@
-# Amharic_-Text_Summarization
+# Amharic_-Text_Summarization **Amharic Text Summarizer** is an NLP dashboard that automatically extracts key information from lengthy Amharic documents while preserving 100% of the original grammatical integrity and context.
