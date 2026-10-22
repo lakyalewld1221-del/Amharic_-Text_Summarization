@@ -56,8 +56,8 @@ if st.button("Generate Summary", type="primary"):
                     output_ids = model.generate(
                         **inputs,
                         max_new_tokens=max_tokens,
-                        min_length=num_sentences * 15,
-                        num_beams=4,
+                        min_length=num_sentences * 20,
+                        num_beams=10,
                         do_sample=False,
                         early_stopping=True
                     )
