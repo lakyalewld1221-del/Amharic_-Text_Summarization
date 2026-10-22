@@ -1,45 +1,38 @@
 import streamlit as st
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-
 MODEL_NAME = "yohannesahunm/mt5-small-Amharic-text-summaization"
-
 st.set_page_config(
     page_title="Amharic Text Summarizer",
     page_icon="📝",
     layout="centered"
 )
-
 @st.cache_resource
 def load_summarization_model():
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
     model.eval()
     return tokenizer, model
-
 st.title("📝 Amharic Text Summarization")
 st.write(
     "Paste an Amharic article or paragraph below "
     "to generate a shorter summary using AI."
 )
-
 with st.spinner("Loading the summarization model..."):
     tokenizer, model = load_summarization_model()
-
 article = st.text_area(
     "Enter Amharic text",
     height=250,
     placeholder="የማጠቃለያ ማድረግ የሚፈልጉትን የአማርኛ ጽሑፍ እዚህ ያስገቡ..."
 )
-
-max_words = st.slider(
-    "Maximum generated tokens",
-    min_value=30,
-    max_value=150,
-    value=100,
-    step=10
+# --- Number of Sentences Slider ---
+num_sentences = st.slider(
+    "የማጠቃለያ ዓረፍተ-ነገሮች ብዛት (Number of summary sentences):",
+    min_value=1,
+    max_value=5,
+    value=2,
+    step=1
 )
-
 if st.button("Generate Summary", type="primary"):
     if not article.strip():
         st.warning("Please enter some Amharic text first.")
@@ -50,34 +43,39 @@ if st.button("Generate Summary", type="primary"):
     else:
         try:
             device = next(model.parameters()).device
-
             inputs = tokenizer(
                 article.strip(),
                 return_tensors="pt",
                 truncation=True,
                 max_length=512
             ).to(device)
-
+            # Dynamically calculate token limit based on selected sentences
+            max_tokens = num_sentences * 45
             with st.spinner("Generating your summary..."):
                 with torch.no_grad():
                     output_ids = model.generate(
                         **inputs,
-                        max_new_tokens=max_words,
+                        max_new_tokens=max_tokens,
+                        min_length=num_sentences * 15,
                         num_beams=4,
                         do_sample=False,
                         early_stopping=True
                     )
-
-                summary = tokenizer.decode(
+                raw_summary = tokenizer.decode(
                     output_ids[0],
                     skip_special_tokens=True
                 ).strip()
-
+            # Ensure summary matches the exact number of sentences using Amharic full stops (።)
+            sentences = [s.strip() for s in raw_summary.replace(".", "።").split("።") if s.strip()]
+            if sentences:
+                selected_sentences = sentences[:num_sentences]
+                summary = "። ".join(selected_sentences) + "።"
+            else:
+                summary = raw_summary
             st.subheader("Generated Summary")
             if summary:
                 st.success("Summary generated successfully.")
                 st.write(summary)
-
                 st.download_button(
                     "Download Summary",
                     data=summary,
@@ -89,11 +87,9 @@ if st.button("Generate Summary", type="primary"):
                     "The model returned an empty summary. "
                     "Try a different or shorter article."
                 )
-
         except Exception as error:
             st.error("Unable to generate the summary.")
             st.exception(error)
-
 st.divider()
 st.caption(
     "AI-based Amharic summarization | "
