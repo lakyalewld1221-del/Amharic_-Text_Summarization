@@ -53,13 +53,15 @@ if st.button("Generate Summary", type="primary"):
             max_tokens = num_sentences * 45
             with st.spinner("Generating your summary..."):
                 with torch.no_grad():
+                                   with torch.no_grad():
                     output_ids = model.generate(
                         **inputs,
                         max_new_tokens=max_tokens,
-                        min_length=num_sentences * 20,
-                        num_beams=10,
+                        num_beams=4,
                         do_sample=False,
-                        early_stopping=True
+                        early_stopping=True,
+                        no_repeat_ngram_size=3,
+                        repetition_penalty=1.3
                     )
                 raw_summary = tokenizer.decode(
                     output_ids[0],
