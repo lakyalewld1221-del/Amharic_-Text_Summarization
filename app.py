@@ -2,6 +2,14 @@ import streamlit as st
 import time
 import re
 from collections import Counter
+from PIL import Image
+
+# Safe import for OCR
+try:
+    import pytesseract
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
 
 # Page Config: Modern Wide Dashboard
 st.set_page_config(
@@ -29,7 +37,6 @@ def extractive_summarize(text, num_sentences=2):
     2. Scores sentences based on term salience and inverted-pyramid position
     3. Returns top sentences in their original chronological order
     """
-    # Split by Ethiopic full stop (።), question marks, and newlines
     raw_sentences = re.split(r'[።\n]+', text)
     sentences = [s.strip() for s in raw_sentences if len(s.strip().split()) >= 4]
 
@@ -39,12 +46,10 @@ def extractive_summarize(text, num_sentences=2):
     if len(sentences) <= num_sentences:
         return "። ".join(sentences) + "።"
 
-    # Compute word frequencies across the entire document
     words = [clean_amharic_word(w) for w in text.split()]
     content_words = [w for w in words if w and w not in AMHARIC_STOPWORDS and len(w) > 1]
     word_freq = Counter(content_words)
 
-    # Score each sentence
     sentence_scores = []
     for idx, sentence in enumerate(sentences):
         sent_words = [clean_amharic_word(w) for w in sentence.split()]
@@ -53,11 +58,10 @@ def extractive_summarize(text, num_sentences=2):
         if not valid_words:
             score = 0.0
         else:
-            # Sum word importance with length normalization
             raw_score = sum(word_freq[w] for w in valid_words)
             score = raw_score / (len(sent_words) ** 0.65)
 
-        # Journalistic lead bias: First 2 sentences often contain the core summary
+        # Lead bias: First two sentences usually carry the highest core information
         if idx == 0:
             score *= 1.45
         elif idx == 1:
@@ -65,14 +69,24 @@ def extractive_summarize(text, num_sentences=2):
 
         sentence_scores.append((score, idx, sentence))
 
-    # Pick top N sentences by score
     top_candidates = sorted(sentence_scores, key=lambda x: x[0], reverse=True)[:num_sentences]
-
-    # Re-order them in original chronological order so the text flows naturally
     top_candidates = sorted(top_candidates, key=lambda x: x[1])
 
     summary = "። ".join([item[2] for item in top_candidates]) + "።"
     return summary
+
+def extract_text_from_image(image):
+    """Extract Amharic text from an image using Tesseract OCR."""
+    if not OCR_AVAILABLE:
+        return "⚠️ OCR library (pytesseract) is not installed."
+    try:
+        extracted = pytesseract.image_to_string(image, lang='amh+eng')
+        return extracted.strip()
+    except Exception:
+        try:
+            return pytesseract.image_to_string(image).strip()
+        except Exception:
+            return "⚠️ OCR Error: Please ensure tesseract-ocr and tesseract-ocr-amh are installed."
 
 # ── Pre-loaded Samples for 1-Click Testing ──────────────────────────────────
 SAMPLE_TEXTS = {
@@ -115,7 +129,7 @@ num_sentences = st.sidebar.slider(
 
 st.sidebar.info("""
 **Approach:** Extractive Summarization  
-**Method:** Salience & Graph Scoring  
+**Input Options:** Text Input or Image OCR  
 **Language:** Amharic (አማርኛ)  
 **Grammar Accuracy:** 100% (Verbatim Authentic)
 """)
@@ -125,22 +139,58 @@ st.sidebar.info("""
 # ═════════════════════════════════════════════════════════════════════════════
 if page == "📝 Summarizer Dashboard":
     st.title("📝 Amharic Extractive Text Summarization Dashboard")
-    st.markdown("Extract key salient sentences directly from lengthy Amharic articles without losing original meaning or grammatical integrity.")
+    st.markdown("Choose whether to type text or upload an image/scanned document to extract and summarize key points.")
     st.markdown("---")
-
-    selected_sample = st.selectbox("💡 Quick Test: Choose a pre-loaded sample (optional)", list(SAMPLE_TEXTS.keys()))
-    default_text = SAMPLE_TEXTS[selected_sample]
 
     col_input, col_output = st.columns([1, 1], gap="medium")
 
     with col_input:
-        st.subheader("📥 Source Amharic Text")
-        article = st.text_area(
-            "Enter or paste text:",
-            value=default_text,
-            height=280,
-            placeholder="የማጠቃለያ ማድረግ የሚፈልጉትን የአማርኛ ጽሑፍ እዚህ ያስገቡ..."
+        st.subheader("📥 Source Input")
+
+        # ── User Input Choice: Text or Image ──
+        input_choice = st.radio(
+            "Select how you want to provide your Amharic document:",
+            ["✍️ Type / Paste Text", "📷 Upload Scanned Image / Photo (OCR)"],
+            horizontal=True
         )
+
+        article = ""
+
+        # Option A: Direct Text Input
+        if input_choice == "✍️ Type / Paste Text":
+            selected_sample = st.selectbox("💡 Choose a pre-loaded sample (optional):", list(SAMPLE_TEXTS.keys()))
+            default_text = SAMPLE_TEXTS[selected_sample] if selected_sample else ""
+
+            article = st.text_area(
+                "Enter or paste Amharic text:",
+                value=default_text,
+                height=260,
+                placeholder="የማጠቃለያ ማድረግ የሚፈልጉትን የአማርኛ ጽሑፍ እዚህ ያስገቡ..."
+            )
+
+        # Option B: Image / Scanned Document Input
+        else:
+            uploaded_file = st.file_uploader(
+                "Upload a scanned Amharic document or camera photo:",
+                type=["png", "jpg", "jpeg", "webp"]
+            )
+            extracted_text = ""
+            if uploaded_file is not None:
+                image = Image.open(uploaded_file)
+                st.image(image, caption="Uploaded Document Preview", use_container_width=True)
+
+                if st.button("🔍 Extract Text from Image"):
+                    with st.spinner("📖 Reading Amharic text via OCR..."):
+                        extracted_text = extract_text_from_image(image)
+                        st.session_state["ocr_content"] = extracted_text
+
+            initial_ocr = st.session_state.get("ocr_content", "")
+            article = st.text_area(
+                "Extracted Amharic Text (you can review or edit below):",
+                value=initial_ocr,
+                height=200,
+                placeholder="የተነበበው የአማርኛ ጽሑፍ እዚህ ይታያል..."
+            )
 
         input_words = len(article.strip().split()) if article.strip() else 0
         input_chars = len(article.strip()) if article.strip() else 0
@@ -157,9 +207,9 @@ if page == "📝 Summarizer Dashboard":
 
         if generate_btn:
             if not article.strip():
-                st.warning("⚠️ Please enter some Amharic text first.")
+                st.warning("⚠️ Please provide some Amharic text or extract an image first.")
             elif len(article.strip()) < 30:
-                st.warning("⚠️ Please enter a longer text to summarize.")
+                st.warning("⚠️ Please provide a longer text to summarize.")
             else:
                 start_time = time.time()
 
@@ -194,7 +244,7 @@ if page == "📝 Summarizer Dashboard":
                     use_container_width=True
                 )
         else:
-            st.info("👈 Paste an article on the left and click **'Generate Extractive Summary'** to see results.")
+            st.info("👈 Choose text or upload an image on the left, then click **'Generate Extractive Summary'**.")
 
 # ═════════════════════════════════════════════════════════════════════════════
 # PAGE 2: EXTRACTIVE ANALYTICS
@@ -210,9 +260,9 @@ elif page == "📊 Extractive Analytics":
         st.subheader("✨ Advantages of Extractive Summarization")
         st.markdown("""
         - **100% Grammatical Accuracy:** Sentences come directly from authentic source text, eliminating hallucinations.
-        - **Zero Incomplete Fragments:** No awkward sentence cuts or missing verbs.
+        - **Dual Input Channels:** Seamlessly handles typed text, online articles, or photo/scanned documents via OCR.
+        - **Zero Incomplete Fragments:** No broken clauses or missing verbs.
         - **Ultra-Low Latency:** Produces summaries in milliseconds without heavy GPU computation.
-        - **Preserves Critical Facts:** Accurately retains exact dates, names, figures, and quotes.
         """)
 
     with col_b:
@@ -224,24 +274,6 @@ elif page == "📊 Extractive Analytics":
         3. **Inverted Pyramid Lead Bias:** Gives precedence to opening sentences which contain core news facts.
         """)
 
-    st.markdown("---")
-    st.subheader("🔍 Processing Pipeline")
-    st.code("""
-[Raw Amharic Article]
-       ↓
-[Amharic Sentence Tokenization (Delimiter: ።)]
-       ↓
-[Stopword Filtering (እና፣ ወይም፣ ላይ፣ ውስጥ...)]
-       ↓
-[Statistical & Positional Salience Scoring]
-       ↓
-[Top-K Candidate Selection (Based on Slider)]
-       ↓
-[Chronological Re-ordering & Punctuation Cleanup]
-       ↓
-[Final Polished Summary]
-    """, language="text")
-
 # ═════════════════════════════════════════════════════════════════════════════
 # PAGE 3: ABOUT PROJECT
 # ═════════════════════════════════════════════════════════════════════════════
@@ -252,11 +284,12 @@ elif page == "ℹ️ About Project":
     st.markdown("""
     ### 🇪🇹 Amharic Text Summarization System
 
-    This project demonstrates automatic text summarization specifically designed for **Amharic (*አማርኛ*)**, addressing the unique linguistic and morphological structures of the Ethiopic script.
+    This project demonstrates automatic text summarization specifically designed for **Amharic (*አማርኛ*)**, addressing the unique linguistic structures of the Ethiopic script.
 
     #### 🌟 Key Benefits:
+    - **Flexible Ingestion:** Users can input plain text directly or upload image scans of printed documents.
     - **Accurate Information Retrieval:** Condenses news, research, and institutional reports without distorting meaning.
-    - **No Hallucination:** Unlike small generative models, extractive summarization guarantees reliable, fact-checked sentences.
+    - **No Hallucination:** Extractive summarization guarantees reliable, fact-checked sentences.
     - **Interactive Dashboard:** Offers customizable sentence counts, compression rate calculation, and quick testing.
     """)
 
