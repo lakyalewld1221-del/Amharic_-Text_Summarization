@@ -1,7 +1,3 @@
---extra-index-url https://download.pytorch.org/whl/cpu
-torch
-transformers
-sentencepiece
-protobuf
 streamlit
-accelerate
+pytesseract
+Pillow
