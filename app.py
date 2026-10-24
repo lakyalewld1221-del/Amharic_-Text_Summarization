@@ -7,6 +7,8 @@ from PIL import Image
 # Safe import for OCR
 try:
     import pytesseract
+    # Tell pytesseract the exact Tesseract binary path on Streamlit Cloud (Linux)
+    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
     OCR_AVAILABLE = True
 except ImportError:
     OCR_AVAILABLE = False
