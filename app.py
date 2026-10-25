@@ -89,7 +89,7 @@ st.sidebar.subheader("⚙️ Settings")
 num_sentences = st.sidebar.slider(
     "Number of summary sentences (የዓረፍተ-ነገሮች ብዛት):",
     min_value=1,
-    max_value=5,
+    max_value=6,
     value=2,
     step=1
 )
