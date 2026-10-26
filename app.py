@@ -2,8 +2,6 @@ import streamlit as st
 import time
 import re
 from collections import Counter
-import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 # ── Page Config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -11,42 +9,7 @@ st.set_page_config(
     page_icon="📝",
     layout="wide"
 )
-# ── mT5 Model Configuration ──────────────────────────────
-MODEL_NAME = (
-    "yohannesahunm/mt5-small-Amharic-text-summaization"
-)
 
-@st.cache_resource
-def load_mt5_model():
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
-
-    model.eval()
-    return tokenizer, model
-
-
-def mt5_summarize(text):
-    tokenizer, model = load_mt5_model()
-
-    inputs = tokenizer(
-        text,
-        return_tensors="pt",
-        truncation=True,
-        max_length=512
-    )
-
-    with torch.inference_mode():
-        output = model.generate(
-            **inputs,
-            max_new_tokens=100,
-            num_beams=4,
-            no_repeat_ngram_size=3
-        )
-
-    return tokenizer.decode(
-        output[0],
-        skip_special_tokens=True
-    ).strip()
 
 # ── Amharic Stopwords ─────────────────────────────────────────────────────────
 AMHARIC_STOPWORDS = {
@@ -125,14 +88,7 @@ page = st.sidebar.radio(
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚙️ Settings")
 num_sentences = st.sidebar.slider(
-    summary_method = st.selectbox(
-    "Choose summarization method:",
-    [
-        "Extractive (Python)",
-        "Abstractive (mT5)",
-        "Compare both"
-    ]
-)
+    
     "Number of summary sentences (የዓረፍተ-ነገሮች ብዛት):",
     min_value=1,
     max_value=5,
@@ -191,62 +147,43 @@ if page == "📝 Summarizer":
 
         if generate_btn:
             if not article.strip():
-                st.warning("Please enter some Amharic text first.")
-
+                st.warning("⚠️ Please enter some Amharic text first.")
             elif len(article.strip()) < 30:
-                st.warning("Please enter a longer text to summarize.")
-
+                st.warning("⚠️ Please enter a longer text to summarize.")
             else:
-                try:
-                    start_time = time.time()
+                start_time = time.time()
+                with st.spinner("🔍 Extracting key sentences..."):
+                    summary = extractive_summarize(article.strip(), num_sentences=num_sentences)
+                elapsed_time = time.time() - start_time
 
-                    # Option 1: Python Extractive
-                    if summary_method == "Extractive (Python)":
-                        with st.spinner("Extracting important sentences..."):
-                            summary = extractive_summarize(
-                                article.strip(),
-                                num_sentences=num_sentences
-                            )
+                summary_words = len(summary.split())
+                compression_ratio = round((1 - (summary_words / max(1, input_words))) * 100, 1)
 
-                        st.markdown("### Python Extractive Summary")
-                        st.write(summary)
+                st.success("✅ Summary Generated Successfully!")
+                st.markdown(
+                    f"""
+                    <div style="background-color:#f0f7f4; padding:20px; border-radius:10px;
+                    border-left:5px solid #28a745; margin-bottom:15px;">
+                    <p style="font-size:17px; line-height:1.9; color:#1e3d2f; margin:0;">{summary}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
-                    # Option 2: mT5
-                    elif summary_method == "Abstractive (mT5)":
-                        with st.spinner("Generating mT5 summary..."):
-                            summary = mt5_summarize(article.strip())
+                o1, o2, o3 = st.columns(3)
+                o1.metric("Summary Words", summary_words)
+                o2.metric("Compression", f"-{compression_ratio}%", delta=f"{compression_ratio}% reduction")
+                o3.metric("Latency", f"{elapsed_time:.3f}s")
 
-                        st.markdown("### mT5 Summary")
-                        st.write(summary)
-
-                    # Option 3: Compare both
-                    else:
-                        with st.spinner("Generating both summaries..."):
-                            extractive_summary = extractive_summarize(
-                                article.strip(),
-                                num_sentences=num_sentences
-                            )
-
-                            mt5_summary = mt5_summarize(article.strip())
-
-                        col1, col2 = st.columns(2)
-
-                        with col1:
-                            st.markdown("### Python Extractive")
-                            st.write(extractive_summary)
-
-                        with col2:
-                            st.markdown("### mT5 Abstractive")
-                            st.write(mt5_summary)
-
-                    elapsed_time = time.time() - start_time
-                    st.caption(
-                        f"Generation time: {elapsed_time:.2f} seconds"
-                    )
-
-                except Exception as e:
-                    st.error(f"Summary generation failed: {e}")
-
+                st.download_button(
+                    label="💾 Download Summary (.txt)",
+                    data=summary,
+                    file_name="amharic_summary.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
+        else:
+            st.info("👈 Paste an Amharic article on the left and click Generate Summary.")
         else:
             st.info(
                 "👈 Enter an Amharic article and click Generate Summary."
