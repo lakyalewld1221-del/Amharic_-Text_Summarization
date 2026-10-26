@@ -2,14 +2,14 @@ import streamlit as st
 import time
 import re
 from collections import Counter
+from PIL import Image
 
 # ── Page Config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Amharic Text Summarizer",
-    page_icon="📝",
+    page_title="Amharic Extractive Summarization Dashboard",
+    page_icon="📊",
     layout="wide"
 )
-
 
 # ── Amharic Stopwords ─────────────────────────────────────────────────────────
 AMHARIC_STOPWORDS = {
@@ -52,29 +52,23 @@ def extractive_summarize(text, num_sentences=2):
 
     top_candidates = sorted(sentence_scores, key=lambda x: x[0], reverse=True)[:num_sentences]
     top_candidates = sorted(top_candidates, key=lambda x: x[1])
-    return "። ".join([item[2] for item in top_candidates]) + "།"
+    return "། ".join([item[2] for item in top_candidates]) + "།"
 
 # ── Pre-loaded Samples ────────────────────────────────────────────────────────
 SAMPLE_TEXTS = {
     "Select a sample text...": "",
-    "⚡ Energy & Export (የኢነርጂ ዜና)": (
+    "⚡ Energy & Export News (የኢነርጂ ዜና)": (
         "ኢትዮጵያ በታዳሽ የኃይል ማመንጫ ዘርፍ የጀመረችውን ሰፊ ኢንቨስትመንት በማጠናከር፣ ለጎረቤት ሀገራት "
         "የምታቀርበውን የኤሌክትሪክ ኃይል በከፍተኛ ደረጃ ለማሳደግ አዲስ ስትራቴጂ ይፋ አደረገች። "
-        "የውሃ እና ኢነርጂ ሚኒስቴር እንዳስታወቀው ባለፉት ዓመታት የተገነቡት ማመንጫዎች ሙሉ በሙሉ "
+        "የውሃ እና ኢነርጂ ሚኒስቴር እንዳስታወቀው፣ ባለፉት ዓመታት የተገነቡት ማመንጫዎች ሙሉ በሙሉ "
         "ወደ ስራ ሲገቡ የአገሪቱ አጠቃላይ አቅም በእጥፍ ይጨምራል። ወደ ኬንያ፣ ሱዳን እና ጅቡቲ "
         "የሚላከው ኃይል ለአገሪቱ ከፍተኛ የውጭ ምንዛሪ እያስገኘ ይገኛል።"
     ),
-    "🌾 Agriculture (ግብርና እና የምግብ ዋስትና)": (
+    "🌾 Agriculture & Food Security (ግብርና)": (
         "ኢትዮጵያ በምስራቅ አፍሪካ ቀንድ የምትገኝ ሰፊና የተለያየ ስነ-ምህዳር ያላት ሀገር ስትሆን ኢኮኖሚዋ "
         "በዋነኝነት የተመሰረተው በግብርና ዘርፍ ላይ ነው። ግብርና ከጠቅላላው ምርት ከሰላሳ በመቶ በላይ "
         "የሚሸፍን ሲሆን ለሰማንያ በመቶ ህዝብ ዋነኛ የገቢ ምንጭ ነው። "
         "የተሻሻሉ ዝርያዎችን ማሰራጨት የምግብ ዋስትናን ለማረጋገጥ ወሳኝ ጥረት ነው።"
-    ),
-    "🏛️ Heritage & Tourism (ቅርስ እና ቱሪዝም)": (
-        "ኢትዮጵያ በረጅም ዘመናት ታሪኳ፣ በልዩ ልዩ ባህሎቿ እና በአስደናቂ የተፈጥሮ መስህቦቿ በዓለም አቀፍ "
-        "ደረጃ የምትታወቅ ጥንታዊ ሀገር ናት። ሀገሪቱ በዓለም ቅርስነት የተመዘገቡ እንደ ላሊበላ ውቅር "
-        "አብያተ ክርስቲያናት እና የአክሱም ሀውልቶች ባሉ ታሪካዊ ሀብቶች ባለቤት ናት። "
-        "ቱሪዝም ከፍተኛ የውጭ ምንዛሪ የሚያስገኝ እና ሰፊ የስራ እድል የሚፈጥር ዘርፍ ነው።"
     )
 }
 
@@ -82,52 +76,110 @@ SAMPLE_TEXTS = {
 st.sidebar.title("📌 Dashboard Menu")
 page = st.sidebar.radio(
     "Go to",
-    ["📝 Summarizer", "📊 Analytics", "ℹ️ About"]
+    ["📝 Summarizer Dashboard", "📊 Extractive Analytics", "ℹ️ About Project"]
 )
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("⚙️ Settings")
+st.sidebar.subheader("⚙️ Summary Settings")
 num_sentences = st.sidebar.slider(
-    
-    "Number of summary sentences (የዓረፍተ-ነገሮች ብዛት):",
+    "Target Sentences (የዓረፍተ-ነገሮች ብዛት):",
     min_value=1,
     max_value=5,
     value=2,
     step=1
 )
+
 st.sidebar.info("""
 **Approach:** Extractive Summarization
+**Input Options:**
+- ✍️ Type or paste text
+- 📷 Upload image + type text
 **Language:** Amharic (አማርኛ)
-**Grammar:** 100% Authentic
-**Latency:** Sub-second
+**Grammar Accuracy:** 100%
 """)
 
 # ═════════════════════════════════════════════════════════════════════════════
-# PAGE 1: SUMMARIZER
+# PAGE 1: SUMMARIZER DASHBOARD
 # ═════════════════════════════════════════════════════════════════════════════
-if page == "📝 Summarizer":
-    st.title("📝 Amharic Text Summarization Dashboard")
-    st.markdown("Paste or type any Amharic article to extract the most important sentences instantly.")
+if page == "📝 Summarizer Dashboard":
+    st.title("📝 Amharic Extractive Text Summarization Dashboard")
+    st.markdown("Type Amharic text directly **or** upload a scanned document image and type the text from it.")
     st.markdown("---")
 
     col_input, col_output = st.columns([1, 1], gap="medium")
 
     with col_input:
-        st.subheader("📥 Input Amharic Text")
+        st.subheader("📥 Source Input")
 
-        selected_sample = st.selectbox(
-            "💡 Choose a pre-loaded sample (optional):",
-            list(SAMPLE_TEXTS.keys())
-        )
-        default_text = SAMPLE_TEXTS.get(selected_sample, "")
-
-        article = st.text_area(
-            "Enter or paste your Amharic text here:",
-            value=default_text,
-            height=300,
-            placeholder="የማጠቃለያ ማድረግ የሚፈልጉትን የአማርኛ ጽሑፍ እዚህ ያስገቡ..."
+        # ── Input Method Choice ──
+        input_choice = st.radio(
+            "Select your input method:",
+            ["✍️ Type / Paste Text", "📷 Upload Document Image + Type Text"],
+            horizontal=True
         )
 
+        article = ""
+
+        # ── OPTION A: Direct Text ──────────────────────────────────────────
+        if input_choice == "✍️ Type / Paste Text":
+            selected_sample = st.selectbox(
+                "💡 Or choose a pre-loaded sample:",
+                list(SAMPLE_TEXTS.keys())
+            )
+            default_text = SAMPLE_TEXTS.get(selected_sample, "")
+
+            article = st.text_area(
+                "Enter or paste your Amharic text below:",
+                value=default_text,
+                height=270,
+                placeholder="የማጠቃለያ ማድረግ የሚፈልጉትን የአማርኛ ጽሑፍ እዚህ ያስገቡ..."
+            )
+
+        # ── OPTION B: Image Upload + Manual Text Entry ─────────────────────
+        else:
+            st.info(
+                "📌 **How to use:**\n"
+                "1. Upload your scanned document or photo below.\n"
+                "2. Look at the image preview on the right.\n"
+                "3. Type the Amharic text from the image into the text box.\n"
+                "4. Click **Generate Extractive Summary**!"
+            )
+
+            col_img, col_txt = st.columns([1, 1], gap="small")
+
+            with col_img:
+                uploaded_file = st.file_uploader(
+                    "📂 Upload Amharic document image:",
+                    type=["png", "jpg", "jpeg", "webp", "bmp"]
+                )
+                if uploaded_file is not None:
+                    image = Image.open(uploaded_file)
+                    st.image(
+                        image,
+                        caption="📄 Your Uploaded Document",
+                        use_container_width=True
+                    )
+                    st.caption("👆 Read the text from this image and type it in the box on the right.")
+                else:
+                    st.markdown(
+                        """
+                        <div style="background:#f9fafb; border: 2px dashed #d1d5db;
+                        border-radius:10px; padding:40px; text-align:center; color:#9ca3af;">
+                        <div style="font-size:40px">📷</div>
+                        <div style="margin-top:10px; font-size:14px">Upload a scanned document<br>or photo here</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+            with col_txt:
+                article = st.text_area(
+                    "✍️ Type the Amharic text from the image here:",
+                    height=270,
+                    placeholder="ምስሉ ላይ ያለውን የአማርኛ ጽሑፍ እዚህ ያስገቡ...\n\nEnter the Amharic text visible in your uploaded image..."
+                )
+
+        # ── Input Metrics ──
         input_words = len(article.strip().split()) if article.strip() else 0
         input_chars = len(article.strip()) if article.strip() else 0
 
@@ -137,34 +189,35 @@ if page == "📝 Summarizer":
         m3.metric("Est. Read Time", f"{max(1, input_words // 150)} min" if input_words else "0 min")
 
         generate_btn = st.button(
-            "🚀 Generate Summary",
+            "🚀 Generate Extractive Summary",
             type="primary",
             use_container_width=True
         )
 
+    # ── Output Column ──────────────────────────────────────────────────────
     with col_output:
-        st.subheader("📤 Generated Summary")
+        st.subheader("📤 Extracted Key Summary")
 
         if generate_btn:
             if not article.strip():
                 st.warning("⚠️ Please enter some Amharic text first.")
             elif len(article.strip()) < 30:
-                st.warning("⚠️ Please enter a longer text to summarize.")
+                st.warning("⚠️ Please provide a longer text (at least a few sentences).")
             else:
                 start_time = time.time()
-                with st.spinner("🔍 Extracting key sentences..."):
+                with st.spinner("🔍 Analyzing and extracting key sentences..."):
                     summary = extractive_summarize(article.strip(), num_sentences=num_sentences)
                 elapsed_time = time.time() - start_time
 
                 summary_words = len(summary.split())
                 compression_ratio = round((1 - (summary_words / max(1, input_words))) * 100, 1)
 
-                st.success("✅ Summary Generated Successfully!")
+                st.success("✅ Extractive Summary Generated Successfully!")
                 st.markdown(
                     f"""
-                    <div style="background-color:#f0f7f4; padding:20px; border-radius:10px;
+                    <div style="background-color:#f0f7f4; padding:18px; border-radius:10px;
                     border-left:5px solid #28a745; margin-bottom:15px;">
-                    <p style="font-size:17px; line-height:1.9; color:#1e3d2f; margin:0;">{summary}</p>
+                    <p style="font-size:17px; line-height:1.8; color:#1e3d2f; margin:0;">{summary}</p>
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -183,81 +236,55 @@ if page == "📝 Summarizer":
                     use_container_width=True
                 )
         else:
-            st.info("👈 Paste an Amharic article on the left and click Generate Summary.")
-        else:
-            st.info(
-                "👈 Enter an Amharic article and click Generate Summary."
-            )
+            st.info("👈 Enter text or upload an image and type the text, then click **Generate Extractive Summary**.")
+
 # ═════════════════════════════════════════════════════════════════════════════
-# PAGE 2: ANALYTICS
+# PAGE 2: EXTRACTIVE ANALYTICS
 # ═════════════════════════════════════════════════════════════════════════════
-elif page == "📊 Analytics":
+elif page == "📊 Extractive Analytics":
     st.title("📊 Extractive Summarization Methodology")
     st.markdown("---")
 
     col_a, col_b = st.columns(2)
 
     with col_a:
-        st.subheader("✨ Why Extractive Summarization?")
+        st.subheader("✨ Advantages")
         st.markdown("""
-        - **100% Grammatical Accuracy:** Every sentence is taken verbatim from the source.
-        - **Zero Hallucination:** No invented or broken phrases.
-        - **Ultra-Low Latency:** Generates summaries in under 50 milliseconds.
-        - **No GPU Required:** Runs efficiently on standard cloud hardware.
+        - **100% Grammatical Accuracy:** Verbatim authentic sentences from the source.
+        - **Dual Input Modes:** Typed text or scanned image (manual entry).
+        - **Zero Hallucination:** No invented words or broken fragments.
+        - **Ultra-Low Latency:** Sub-second processing speed.
+        - **Cloud Reliable:** No system-level dependencies required.
         """)
 
     with col_b:
-        st.subheader("🎯 Sentence Scoring Formula")
+        st.subheader("🎯 Scoring Formula")
         st.latex(r"Score(S_i) = \alpha_i \times \frac{\sum_{w \in S_i} Freq(w)}{Length(S_i)^{0.65}}")
         st.markdown("""
-        1. **Term Salience:** Scores content words by document frequency.
-        2. **Length Normalization:** Avoids bias toward very long sentences.
-        3. **Lead Bias ($\\alpha_i$):** First sentences carry 45% extra weight.
+        1. **Term Salience:** Scores sentences by high-frequency content words.
+        2. **Length Normalization:** Balances short vs. long sentence bias.
+        3. **Lead Bias:** Opening sentences receive higher weight.
         """)
 
-    st.markdown("---")
-    st.subheader("🔍 Processing Pipeline")
-    st.code("""
-[Raw Amharic Text]
-        ↓
-[Sentence Segmentation (Delimiter: ።)]
-        ↓
-[Amharic Stopword Filtering]
-        ↓
-[Salience & Position Scoring]
-        ↓
-[Top-K Sentence Selection]
-        ↓
-[Chronological Re-ordering]
-        ↓
-[Final Summary Output]
-    """, language="text")
-
 # ═════════════════════════════════════════════════════════════════════════════
-# PAGE 3: ABOUT
+# PAGE 3: ABOUT PROJECT
 # ═════════════════════════════════════════════════════════════════════════════
-elif page == "ℹ️ About":
+elif page == "ℹ️ About Project":
     st.title("ℹ️ About This Project")
     st.markdown("---")
     st.markdown("""
     ### 🇪🇹 Amharic Extractive Text Summarization System
 
-    This application automatically condenses lengthy Amharic news articles, research documents,
-    and institutional reports into concise, grammatically accurate summaries.
-
-    #### 🌟 Key Features:
-    - **Zero Hallucination:** Extracted sentences are 100% authentic.
-    - **Customizable Length:** 1 to 5 target sentences via sidebar slider.
-    - **Live Metrics:** Real-time word count, compression ratio, and latency.
-    - **Pre-loaded Samples:** One-click testing with built-in Amharic articles.
-    - **Download Export:** Save generated summaries as `.txt` files.
+    This app condenses lengthy Amharic documents into precise, grammatically accurate summaries.
+    Users can input text directly or upload scanned document images and type the visible text.
 
     #### 🛠️ Technology Stack:
     - **Framework:** Streamlit
-    - **Algorithm:** Salience-based Extractive NLP
+    - **Image Handling:** Pillow (PIL)
+    - **NLP Engine:** Custom salience-based extractive algorithm
     - **Language:** Amharic (አማርኛ) — Ethiopic script
     - **Hosting:** Streamlit Community Cloud
     """)
 
 st.divider()
-st.caption("Amharic Text Summarization Dashboard | Powered by Extractive NLP | Built with Streamlit")
+st.caption("Amharic Extractive Text Summarization Dashboard | Built with Streamlit")
